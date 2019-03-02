@@ -3,7 +3,7 @@ import std.file: exists, read, write;
 import std.path: expandTilde;
 import std.process: execute;
 import std.regex: ctRegex, matchFirst;
-import std.json: parseJSON, toJSON, JSONValue;
+import std.json;
 
 const auto regSock = ctRegex!"SSH_AUTH_SOCK=([A-Za-z\\-\\.0-9/]+);";
 const auto regPid = ctRegex!"SSH_AGENT_PID=([0-9]+);";
@@ -18,11 +18,21 @@ int main() {
   if(expandedConfig.exists) {
     try {
       auto saved = (cast(string)expandedConfig.read).parseJSON;
-      if("pid" in saved && "sock" in saved && exists("/proc/" ~ saved["pid"].str)) {
+      if("pid" in saved &&
+         saved["pid"].type == JSONType.string &&
+         "sock" in saved &&
+         saved["sock"].type == JSONType.string &&
+         exists("/proc/" ~ saved["pid"].str)) {
         printExports(saved["pid"].str, saved["sock"].str);
         needStart = false;
+      } else {
+        printError("Broken config");
       }
-    } catch(Throwable) { }
+    } catch(JSONException) {
+      printError("Broken config");
+    }
+    // try {
+    // } catch(Throwable) { }
   }
 
   if(needStart) {
@@ -57,5 +67,5 @@ void printError(string msg) {
     "\033[31m" ~
     "[ERROR] %s" ~
     "\033[0m"
-  )(msg);
+    )(msg);
 }
