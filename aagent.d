@@ -1,21 +1,23 @@
-import std.stdio: writef;
+import std.stdio: writef, writefln;
 import std.file: exists, read, write;
 import std.path: expandTilde;
-import std.process: execute, environment;
+import std.process: execute;
 import std.regex: ctRegex, matchFirst;
 import std.json: parseJSON, toJSON, JSONValue;
 
 const auto regSock = ctRegex!"SSH_AUTH_SOCK=([A-Za-z\\-\\.0-9/]+);";
 const auto regPid = ctRegex!"SSH_AGENT_PID=([0-9]+);";
 
-const auto configFile = "~/.alien-agent.json";
+const auto config = "~/.alien-agent.json";
 
 int main() {
+  const auto expandedConfig = config.expandTilde;
+
   bool needStart = true;
 
-  if(configFile.expandTilde.exists) {
+  if(expandedConfig.exists) {
     try {
-      auto saved = (cast(string)configFile.expandTilde.read).parseJSON;
+      auto saved = (cast(string)expandedConfig.read).parseJSON;
       if("pid" in saved && "sock" in saved && exists("/proc/" ~ saved["pid"].str)) {
         printExports(saved["pid"].str, saved["sock"].str);
         needStart = false;
@@ -25,13 +27,16 @@ int main() {
 
   if(needStart) {
     auto res = execute(["ssh-agent"]);
-    if(res.status != 0) return 1;
+    if(res.status != 0) {
+      printError("Cannot start ssh-agent!");
+      return 1;
+    }
 
     auto sock = matchFirst(res.output, regSock)[1];
     auto pid = matchFirst(res.output, regPid)[1];
 
     auto json = JSONValue(["pid": pid, "sock": sock]);
-    configFile.expandTilde.write(toJSON(json));
+    expandedConfig.write(json.toJSON);
     printExports(pid, sock);
   }
 
@@ -45,4 +50,12 @@ void printExports(string pid, string sock) {
     "SSH_AUTH_SOCK=%s;" ~
     "export SSH_AUTH_SOCK;"
     )(pid, sock);
+}
+
+void printError(string msg) {
+  writefln!(
+    "\033[31m" ~
+    "[ERROR] %s" ~
+    "\033[0m"
+  )(msg);
 }
