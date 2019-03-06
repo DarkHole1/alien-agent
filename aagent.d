@@ -31,8 +31,6 @@ int main() {
     } catch(JSONException) {
       printError("Broken config");
     }
-    // try {
-    // } catch(Throwable) { }
   }
 
   if(needStart) {
@@ -64,8 +62,9 @@ void printExports(string pid, string sock) {
 
 void printError(string msg) {
   writefln!(
-    "\033[31m" ~
+    "echo -e " ~
+    "\"\\033[31m" ~
     "[ERROR] %s" ~
-    "\033[0m"
+    "\\033[0m\";"
     )(msg);
 }
