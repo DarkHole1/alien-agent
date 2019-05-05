@@ -10,6 +10,17 @@ const auto regPid = ctRegex!"SSH_AGENT_PID=([0-9]+);";
 
 const auto config = "~/.alien-agent.json";
 
+enum Color {
+  Black,
+  Red,
+  Green,
+  Yellow,
+  Blue,
+  Magenta,
+  Cyan,
+  White
+}
+
 int main() {
   const auto expandedConfig = config.expandTilde;
 
@@ -21,10 +32,11 @@ int main() {
       if("pid" in saved &&
          saved["pid"].type == JSONType.string &&
          "sock" in saved &&
-         saved["sock"].type == JSONType.string &&
-         exists("/proc/" ~ saved["pid"].str)) {
-        printExports(saved["pid"].str, saved["sock"].str);
-        needStart = false;
+         saved["sock"].type == JSONType.string) {
+        if(exists("/proc/" ~ saved["pid"].str)) {
+          printExports(saved["pid"].str, saved["sock"].str);
+          needStart = false;
+        }
       } else {
         printError("Broken config");
       }
@@ -43,9 +55,13 @@ int main() {
     auto sock = matchFirst(res.output, regSock)[1];
     auto pid = matchFirst(res.output, regPid)[1];
 
+    printOk("Ssh-agent started!");
+
     auto json = JSONValue(["pid": pid, "sock": sock]);
     expandedConfig.write(json.toJSON);
     printExports(pid, sock);
+  } else {
+    printOk("Ssh-agent already started");
   }
 
   return 0;
@@ -60,11 +76,19 @@ void printExports(string pid, string sock) {
     )(pid, sock);
 }
 
-void printError(string msg) {
+void printMessage(string status, string msg, Color color = Color.White) {
   writefln!(
     "echo -e " ~
-    "\"\\033[31m" ~
-    "[ERROR] %s" ~
+    "\"\\033[3%dm" ~
+    "[%s] %s" ~
     "\\033[0m\";"
-    )(msg);
+    )(color, status, msg);
+}
+
+void printError(string msg) {
+  printMessage("ERROR", msg, Color.Red);
+}
+
+void printOk(string msg) {
+  printMessage("OK", msg, Color.Green);
 }
