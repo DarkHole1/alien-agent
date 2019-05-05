@@ -1,6 +1,6 @@
 import std.stdio: writef, writefln;
-import std.file: exists, read, write;
-import std.path: expandTilde;
+import std.file: exists, read, write, dirEntries, SpanMode, isFile;
+import std.path: expandTilde, extension;
 import std.process: execute;
 import std.regex: ctRegex, matchFirst;
 import std.json;
@@ -9,6 +9,7 @@ const auto regSock = ctRegex!"SSH_AUTH_SOCK=([A-Za-z\\-\\.0-9/]+);";
 const auto regPid = ctRegex!"SSH_AGENT_PID=([0-9]+);";
 
 const auto config = "~/.alien-agent.json";
+const auto sshDir = "~/.ssh/";
 
 enum Color {
   Black,
@@ -23,6 +24,7 @@ enum Color {
 
 int main() {
   const auto expandedConfig = config.expandTilde;
+  const auto expandedSshDir = sshDir.expandTilde;
 
   bool needStart = true;
 
@@ -64,6 +66,15 @@ int main() {
     printOk("Ssh-agent already started");
   }
 
+  if(needStart) {
+    printOk(expandedSshDir);
+    foreach(string file; dirEntries(expandedSshDir, SpanMode.depth)) {
+      if(isFile(file) && file.extension == "") {
+        sshAdd(file);
+      }
+    }
+  }
+
   return 0;
 }
 
@@ -91,4 +102,11 @@ void printError(string msg) {
 
 void printOk(string msg) {
   printMessage("OK", msg, Color.Green);
+}
+
+void sshAdd(string file) {
+  auto res = execute(["ssh-add", file]);
+  if(res.status == 0) {
+    printMessage("ADDED", file, Color.Green);
+  }
 }
