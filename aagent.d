@@ -62,17 +62,15 @@ int main() {
     auto json = JSONValue(["pid": pid, "sock": sock]);
     expandedConfig.write(json.toJSON);
     printExports(pid, sock);
-  } else {
-    printOk("Ssh-agent already started");
-  }
 
-  if(needStart) {
     printOk(expandedSshDir);
     foreach(string file; dirEntries(expandedSshDir, SpanMode.depth)) {
       if(isFile(file) && file.extension == "") {
-        sshAdd(file);
+        sshAdd(file, pid, sock);
       }
     }
+  } else {
+    printOk("Ssh-agent already started");
   }
 
   return 0;
@@ -104,9 +102,15 @@ void printOk(string msg) {
   printMessage("OK", msg, Color.Green);
 }
 
-void sshAdd(string file) {
-  auto res = execute(["ssh-add", file]);
+void sshAdd(string file, string pid, string sock) {
+  auto res = execute(["ssh-add", file], [
+    "SSH_AGENT_PID": pid,
+    "SSH_AUTH_SOCK": sock
+  ]);
   if(res.status == 0) {
     printMessage("ADDED", file, Color.Green);
+  } else {
+    printError("Cannot add file: " ~ file);
+    printError(res.output);
   }
 }
